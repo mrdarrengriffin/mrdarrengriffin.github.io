@@ -13,6 +13,8 @@ const type = () => {
     const currentIndex = typed.value.length;
     const text = props.text;
 
+    if(!text) return;
+
     if (currentIndex < text.length) {
         typed.value = text.slice(0, currentIndex + 1);
         // rand between 10 and 500
