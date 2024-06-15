@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
+/* @ts-ignore */
 import Car from './Car.js';
-import { DSAP } from '../../utils/dsap.js';
+/* @ts-ignore */
+import { DSAP } from '@/utils/dsap.js';
 
 
 onMounted(() => {
