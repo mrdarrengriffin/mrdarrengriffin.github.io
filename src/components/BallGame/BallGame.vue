@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import BallGame from './BallGame.js';
 
-BallGame();
+new BallGame();
 </script>
 
 <template>

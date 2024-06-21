@@ -144,10 +144,12 @@ export default class BallGame {
             _self.waiting = true;
             
             // add to stack
-            Matter.Composite.add(_self.stack, _self.nextBall);
             _self.nextBall.collisionFilter.group = 1;
             
             _self.nextBall.isStatic = false;
+            // move down a little
+            _self.Body.setPosition(_self.nextBall, { x: _self.nextBall.position.x, y: 100 });
+            Matter.Composite.add(_self.stack, _self.nextBall);
             // create new ball
             _self.nextBall = _self.Bodies.circle(window.innerWidth / 2, window.innerHeight / 2, 20, {
                 render: {
@@ -188,8 +190,3 @@ export default class BallGame {
 
     }
 };
-
-// create demo interface
-// not required to use Matter.js
-
-new BallGame();
