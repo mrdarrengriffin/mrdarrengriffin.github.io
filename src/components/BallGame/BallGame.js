@@ -24,7 +24,9 @@ export default class BallGame {
     world;
     runner;
     nextBall;
+    nextBallPlaceholder;
     waiting;
+    stack;
 
     constructor() {
         // create engine
@@ -38,7 +40,7 @@ export default class BallGame {
             options: {
                 width: window.innerWidth,
                 height: window.innerHeight,
-                wireframes: false
+                wireframes: false,
             }
         });
 
@@ -52,24 +54,17 @@ export default class BallGame {
         var rows = 10,
             yy = 600 - 21 - 40 * rows;
 
-        let _self = this;
-        var stack = this.Composites.stack(400, yy, 5, rows, 0, 0, function (x, y) {
-            return _self.Bodies.circle(x * 1.1, y * 1.1, 40, { render: { fillStyle: _self.colors[Math.floor(_self.colors.length * Math.random())] } });
-        });
+
 
         this.World.add(this.world, [
-            stack,
+        
             // walls. Hug the edges of the window
-            this.Bodies.rectangle(window.innerWidth / 2, 0, window.innerWidth, 20, { isStatic: true }),
-            this.Bodies.rectangle(window.innerWidth / 2, window.innerHeight, window.innerWidth, 20, { isStatic: true }),
-            this.Bodies.rectangle(window.innerWidth, window.innerHeight / 2, 20, window.innerHeight, { isStatic: true }),
-            this.Bodies.rectangle(0, window.innerHeight / 2, 20, window.innerHeight, { isStatic: true })
+            this.Bodies.rectangle(this.render.options.width / 2, 0, this.render.options.width, 50, { isStatic: true }),
+            this.Bodies.rectangle(this.render.options.width / 2, this.render.options.height, this.render.options.width, 50, { isStatic: true }),
+            this.Bodies.rectangle(0, this.render.options.height / 2, 50, this.render.options.height, { isStatic: true }),
+            this.Bodies.rectangle(this.render.options.width, this.render.options.height / 2, 50, this.render.options.height, { isStatic: true }),
 
         ]);
-
-        var ball = this.Bodies.circle(100, 400, 50, { density: 0.04, frictionAir: 0.005 });
-
-        this.World.add(this.world, ball);
 
         // add mouse control
         var mouse = this.Mouse.create(this.render.canvas),
@@ -94,53 +89,90 @@ export default class BallGame {
             max: { x: window.innerWidth, y: window.innerHeight }
         });
 
+        let _self = this;
+
+        // create empty group for only balls that can collide
+        this.stack = this.Composites.stack(20, 20, 10, 10, 0, 0, function (x, y) {});
+
         Matter.Events.on(this.engine, 'collisionStart', function (event) {
             // loop through all pairs, merge if they are touching
             var pairs = event.pairs;
             for (var i = 0; i < pairs.length; i++) {
                 var pair = pairs[i];
                 if (pair.bodyA.render.fillStyle === pair.bodyB.render.fillStyle && pair.bodyA.circleRadius === pair.bodyB.circleRadius) {
-                    _self.Body.scale(pair.bodyB, 1.5, 1.5);
-                    // remove the body from the world
-                    _self.Composite.remove(stack, pair.bodyB);
-                    _self.Composite.remove(stack, pair.bodyA);
+
+                    console.log('match', pair.bodyA, pair.bodyB);
+                    Matter.Composite.remove(_self.world, pair.bodyA);
+                    Matter.Composite.remove(_self.world, pair.bodyB);
+
+
+                    // new ball, same color, bigger size
+                    var newBall = _self.Bodies.circle((pair.bodyA.position.x + pair.bodyB.position.x) / 2, (pair.bodyA.position.y + pair.bodyB.position.y) / 2, pair.bodyA.circleRadius * 1.5, {
+                        render: {
+                            fillStyle: pair.bodyA.render.fillStyle
+                        }
+                    });
+                    Matter.World.add(_self.world, newBall);
 
                 }
             }
         });
 
-        // create a fixed ball at the top that mimics the x position of the mouse
-        this.nextBall = this.Bodies.circle(100, 50, 50, { isStatic: true });
-        // fill
-        this.nextBall.render.fillStyle = Math.floor(Math.random() * _self.colors.length);
+        this.nextBallPlaceholder = this.Bodies.circle(window.innerWidth / 2, window.innerHeight / 2, 20);
+        // just an outline
+        this.nextBallPlaceholder.render.strokeStyle = '#333';
+        this.nextBallPlaceholder.render.lineWidth = 2;
+        // no fill
+        this.nextBallPlaceholder.render.fillStyle = 'transparent';
+        this.nextBallPlaceholder.isStatic = true;
+        // doesn't collide with other balls
+        this.nextBallPlaceholder.collisionFilter.group = -1;
+        Matter.World.add(this.world, this.nextBallPlaceholder);
 
-        this.World.add(this.world, this.nextBall);
-        this.Events.on(this.engine, 'beforeUpdate', function () {
-            if(!_self.nextBall.isStatic) return;
-            _self.Body.setPosition(_self.nextBall, { x: mouse.position.x, y: 75 });
-            _self.nextBall.render.opacity = 1;
+        this.nextBall = this.Bodies.circle(window.innerWidth / 2, window.innerHeight / 2, 20, {
+            render: {
+                fillStyle: this.colors[Math.floor(Math.random() * this.colors.length)]
+            }
         });
+        this.nextBall.isStatic = true;
+        this.nextBall.collisionFilter.group = -1;
+        Matter.World.add(this.world, this.nextBall);
 
-        // on click add physics to the ball
-        this.waiting = false;
-        document.body.addEventListener('click', function () {
-            if(_self.waiting) return;
+        // on click spawn new ball
+        document.body.addEventListener('click', function (event) {
+            if (_self.waiting) return;
             _self.waiting = true;
-            _self.Body.setStatic(_self.nextBall, false);
+            
             // add to stack
-            _self.Composite.add(_self.world, _self.nextBall);
+            Matter.Composite.add(_self.stack, _self.nextBall);
+            _self.nextBall.collisionFilter.group = 1;
+            
+            _self.nextBall.isStatic = false;
+            // create new ball
+            _self.nextBall = _self.Bodies.circle(window.innerWidth / 2, window.innerHeight / 2, 20, {
+                render: {
+                    fillStyle: _self.colors[Math.floor(Math.random() * _self.colors.length)]
+                }
+            });
+            _self.nextBall.isStatic = true;
+            // doesn't collide with other balls
+            _self.nextBall.collisionFilter.group = -1;
+            // move to mouse position
+            _self.Body.setPosition(_self.nextBall, { x: event.clientX, y: 50 });
             setTimeout(function () {
+                Matter.World.add(_self.world, _self.nextBall);
                 _self.waiting = false;
-            _self.nextBall = _self.Bodies.circle(100, 50, 50, { isStatic: true, render: {opacity: 0} });
-        
-                // fill
-                _self.nextBall.render.fillStyle = _self.colors[Math.floor(_self.colors.length * Math.random())];
-
-                _self.World.add(_self.world, _self.nextBall);
-                
-            }, 1000);
+            }, 750);
         });
 
+        // on mouse move, move the next ball
+        document.body.addEventListener('mousemove', function (event) {
+            let x = event.clientX;
+            if(x < 50) x = 50;
+            if(x > window.innerWidth - 20) x = window.innerWidth - 20;
+            _self.Body.setPosition(_self.nextBall, { x, y: 50 });
+            _self.Body.setPosition(_self.nextBallPlaceholder, { x, y: 50 });
+        });
 
         // context for MatterTools.Demo
         return {
